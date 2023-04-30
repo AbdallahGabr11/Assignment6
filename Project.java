@@ -1,147 +1,98 @@
-import java.io.*;
-
-import java.util.*;
-
-import javax.xml.parsers.*;
-
-import org.w3c.dom.*;
-
-import org.xml.sax.*;
+import java.io.File;
 
 
-public class AutosarFileReorder {
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Scanner;
 
-
-    public static void main(String[] args) throws Exception {
-
-        try {
-
-            if (args.length != 1) {
-
-                System.out.println("Usage: AutosarFileReorder <inputfile>");
-
+public class Project {
+    public static void main(String[] args){
+        String s;
+        if (args.length == 0) {
+            System.out.println("Please provide the input file as argument");
+            return;
+        }
+        String inputFile = args[0];
+        System.out.println("for input file \""+inputFile+"\"");
+        if (!inputFile.endsWith(".arxml")) {
+            try {
+                throw new NotVaildAutosarFileException("NotVaildAutosarFileException: Invalid ARXML file extension");
+            } catch (NotVaildAutosarFileException e) {
+                System.out.println(e.getMessage());
                 return;
-
             }
-
-            String inputFileName = args[0];
-
-            if (!inputFileName.endsWith(".arxml")) {
-
-                throw new NotValidAutosarFileException("Not a valid Autosar file.");
-
+        }
+        File f=new File(inputFile);
+        ArrayList<Arxml> arr = new ArrayList<Arxml>();
+        Arxml xml=new Arxml();
+        try {
+            Scanner input=new Scanner(f);
+            if(!input.hasNextLine())
+                try {
+                    throw new EmptyAutosarFileException("EmptyAutosarFileException: Input ARXML file is empty");
+            } catch (EmptyAutosarFileException ex) {
+                System.out.println(ex.getMessage());
+                return;
             }
-
-
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
-            DocumentBuilder db = dbf.newDocumentBuilder();
-
-            Document doc = db.parse(new File(inputFileName));
-
-
-            NodeList containerNodes = doc.getElementsByTagName("CONTAINER");
-
-
-            List<Element> containerElements = new ArrayList<Element>();
-
-            for (int i = 0; i < containerNodes.getLength(); i++) {
-
-                Element containerElement = (Element) containerNodes.item(i);
-
-                containerElements.add(containerElement);
-
-            }
-
-            Collections.sort(containerElements, new Comparator<Element>() {
-
-                @Override
-
-                public int compare(Element e1, Element e2) {
-
-                    String shortName1 = e1.getElementsByTagName("SHORT-NAME").item(0).getTextContent();
-
-                    String shortName2 = e2.getElementsByTagName("SHORT-NAME").item(0).getTextContent();
-
-                    return shortName1.compareTo(shortName2);
-
+            while(input.hasNextLine()){
+                s=input.nextLine();
+                if (s.startsWith(" <CONTAINER"))
+                    xml.setContainer(s.substring(s.indexOf('=')+2,s.indexOf('\"', s.indexOf('\"')+1)));
+                else if(s.startsWith(" <SHORT-NAME"))
+                    xml.setShortName(s.substring(s.indexOf('>')+1,s.indexOf('<', s.indexOf('>'))));
+                else if (s.startsWith(" <LONG-NAME"))
+                    xml.setLongName(s.substring(s.indexOf('>')+1,s.indexOf('<', s.indexOf('>'))));
+                else if (s.startsWith(" </CONTAINER>")){
+                        arr.add(xml);
+                        xml=new Arxml();
                 }
-
-            });
-
-
-            Document newDoc = db.newDocument();
-
-            Element rootElement = newDoc.createElement("AUTOSAR");
-
-            newDoc.appendChild(rootElement);
-
-            for (Element containerElement : containerElements) {
-
-                Element newContainerElement = (Element) newDoc.importNode(containerElement, true);
-
-                rootElement.appendChild(newContainerElement);
-
             }
-
-
-            String outputFileName = inputFileName.replace(".arxml", "_mod.arxml");
-
-            TransformerFactory tf = TransformerFactory.newInstance();
-
-            Transformer transformer = tf.newTransformer();
-
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-
-            transformer.setOutputProperty(OutputKeys.METHOD, "xml");
-
-            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-
-            DOMSource source = new DOMSource(newDoc);
-
-            StreamResult result = new StreamResult(new File(outputFileName));
-
-            transformer.transform(source, result);
-
-
-        } catch (NotValidAutosarFileException ex1) {
-
-            System.out.println("ERROR: " + ex1.getMessage());
-
-        } catch (EmptyAutosarFileException ex2) {
-
-            System.out.println("ERROR: " + ex2.getMessage());
-
-        } catch (Exception ex3) {
-
-            System.out.println("ERROR: " + ex3.getMessage());
-
+        } catch (FileNotFoundException ex) {
+            System.out.println("File Not Found");
+            return;
         }
-
-    }
-
-
-    static class NotValidAutosarFileException extends Exception {
-
-        public NotValidAutosarFileException(String message) {
-
-            super(message);
-
+        Collections.sort(arr);
+        s="";
+        for(Arxml aa:arr){
+            s=s+aa.toString();
         }
-
+        String ss="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +"<AUTOSAR>\n"+s+"</AUTOSAR>";
+        try {
+            s=inputFile.substring(0,inputFile.indexOf('.'))+"_mod.arxml";
+            FileOutputStream file=new FileOutputStream(s);
+            file.write(ss.getBytes());
+        } catch (FileNotFoundException ex) {
+            System.out.println("File Not Found");
+        } catch (IOException ex) {
+            System.out.println(ex.getMessage());
+        }
+        System.out.println("Done modulation");
     }
+        
 
-
-    static class EmptyAutosarFileException extends Exception {
-
-        public EmptyAutosarFileException(String message) {
-
-            super(message);
-
-
-        } 
 
 }
 
 
- }
+
+
+
+
+
+
+
+class NotVaildAutosarFileException extends Exception {
+    public NotVaildAutosarFileException(String message) {
+        super(message);
+    }
+}
+
+class EmptyAutosarFileException extends Exception {
+    public EmptyAutosarFileException(String message) {
+        super(message);
+    }
+}
+
